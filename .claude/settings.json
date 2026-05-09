@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Write(./trips/**)",
+      "Write(./scripts/dist/**)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(tsc:*)",
+      "Bash(git:*)",
+      "mcp__gmail__*",
+      "mcp__gsheets__sheets_get_*",
+      "mcp__gsheets__sheets_update_values",
+      "mcp__gsheets__sheets_append_values"
+    ],
+    "deny": [
+      "mcp__gsheets__sheets_delete_*",
+      "mcp__gsheets__sheets_clear_*",
+      "mcp__gmail__delete_*",
+      "mcp__gmail__trash_*"
+    ]
+  }
+}

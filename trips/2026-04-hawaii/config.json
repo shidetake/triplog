@@ -1,0 +1,21 @@
+{
+  "slug": "2026-04-hawaii",
+  "spreadsheetId": "1QEUhnI0BQjfrSXbEmS5WjkGcLTYGXU9D3fNSe59cXV4",
+  "sheetName": "2026-04Hawaii",
+  "headerRow": 18,
+  "dataStartRow": 19,
+  "writeRange": "B19:I",
+  "period": { "start": "2026-04-28", "end": "2026-05-05" },
+  "originAirport": "NRT",
+  "destinationAirport": "HNL",
+  "primaryStay": "Royal Hawaiian",
+  "queries": [
+    "from:(no-reply OR receipt OR receipts) \"$\" after:2026/04/28 before:2026/05/06",
+    "from:banking ご利用 after:2026/04/28 before:2026/05/07",
+    "from:banking ご利用金額確定 after:2026/04/28 before:2026/05/07",
+    "from:deltaairlines receipt SASAKI",
+    "from:uber.com receipt after:2026/04/27 before:2026/05/07",
+    "subject:(receipt OR confirmation OR folio) after:2026/04/28 before:2026/05/06"
+  ],
+  "fxRateOverride": null
+}
