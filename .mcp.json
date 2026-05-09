@@ -6,9 +6,10 @@
     },
     "gsheets": {
       "command": "npx",
-      "args": ["-y", "mcp-google-sheets"],
+      "args": ["-y", "mcp-google-sheets@2.0.1"],
       "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "${HOME}/.config/gcloud/travel-expenses-oauth.json"
+        "CREDENTIALS_PATH": "${HOME}/.config/gcloud/travel-expenses-oauth.json",
+        "TOKEN_PATH": "${HOME}/.config/gcloud/triplog-sheets-token.json"
       }
     }
   }

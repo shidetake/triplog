@@ -9,16 +9,30 @@
       "Bash(node:*)",
       "Bash(tsc:*)",
       "Bash(git:*)",
-      "mcp__gmail__*",
-      "mcp__gsheets__sheets_get_*",
-      "mcp__gsheets__sheets_update_values",
-      "mcp__gsheets__sheets_append_values"
+      "mcp__gmail__search_*",
+      "mcp__gmail__read_*",
+      "mcp__gmail__download_*",
+      "mcp__gmail__list_*",
+      "mcp__gmail__get_*",
+      "mcp__gsheets__get_sheet_data",
+      "mcp__gsheets__list_sheets",
+      "mcp__gsheets__list_spreadsheets",
+      "mcp__gsheets__update_cells",
+      "mcp__gsheets__batch_update_cells"
     ],
     "deny": [
-      "mcp__gsheets__sheets_delete_*",
-      "mcp__gsheets__sheets_clear_*",
       "mcp__gmail__delete_*",
-      "mcp__gmail__trash_*"
+      "mcp__gmail__batch_delete_*",
+      "mcp__gmail__send_*",
+      "mcp__gmail__draft_*",
+      "mcp__gmail__modify_*",
+      "mcp__gmail__create_filter",
+      "mcp__gmail__create_label",
+      "mcp__gmail__update_label",
+      "mcp__gsheets__create_*",
+      "mcp__gsheets__share_*",
+      "mcp__gsheets__delete_*",
+      "mcp__gsheets__clear_*"
     ]
   }
 }

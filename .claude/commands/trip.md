@@ -11,8 +11,8 @@ argument-hint: <slug>
 
 1. `trips/$ARGUMENTS/config.json` を読み、`spreadsheetId` / `sheetName` / `period` / `queries` を取得
 2. **`config.sheetName` 以外のシートには触れない**（読み取りすら避ける）
-3. `mcp__gmail__search_messages` で `config.queries` を順に実行、messageId を集める
-4. 各メッセージを `mcp__gmail__get_message` / `mcp__gmail__get_attachment` で取得し、`trips/$ARGUMENTS/raw/<messageId>.json` にダンプ
+3. `mcp__gmail__search_emails` で `config.queries` を順に実行、messageId を集める
+4. 各メッセージを `mcp__gmail__read_email` / `mcp__gmail__download_attachment` で取得し、`trips/$ARGUMENTS/raw/<messageId>.json` にダンプ
 5. PDF添付は `pdf-parse` でテキスト化して同ディレクトリに保存
 6. `@expense-extractor` サブエージェントで各 raw を `RawExpense` JSON に
 7. `scripts/` を通して正規化:
@@ -23,8 +23,8 @@ argument-hint: <slug>
    - カテゴリ別合計（円）
    - 対象シートの現在の `B19:I<最終行>` 範囲とその行数
    - 上書きされる範囲
-10. ユーザーが明示的に「書き込んでOK」と承認したら `mcp__gsheets__sheets_update_values` で `<sheetName>!B19:I<最終行>` を一括更新
-11. 直後に同範囲を `mcp__gsheets__sheets_get_values` で読み返し、行数と合計が一致することを確認
+10. ユーザーが明示的に「書き込んでOK」と承認したら `mcp__gsheets__update_cells` で `<sheetName>!B19:I<最終行>` を一括更新
+11. 直後に同範囲を `mcp__gsheets__get_sheet_data` で読み返し、行数と合計が一致することを確認
 12. 結果サマリ（書き込み済み件数、カテゴリ別合計）をユーザーに報告
 
 ## 厳守事項
@@ -32,7 +32,7 @@ argument-hint: <slug>
 - `config.sheetName` 以外のシートへの書き込み・クリア・削除は絶対禁止
 - 推測値で欄を埋めない（不明は `null`、TSV化時は空欄）
 - 確定日ベースの記録NG。必ず利用日
-- ユーザーの承認なしに `sheets_update_values` を呼ばない
+- ユーザーの承認なしに `update_cells` / `batch_update_cells` を呼ばない
 - 詳細ルールは `skills/SKILL.md` と `skills/rules/*.md`
 
 ## エラー時

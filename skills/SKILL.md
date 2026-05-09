@@ -45,11 +45,11 @@
 
 ## 2. Gmail から候補メールを集める
 
-1. `config.queries` を順に `mcp__gmail__search_messages` に投げる
+1. `config.queries` を順に `mcp__gmail__search_emails` に投げる
 2. messageId のセットで重複排除
 3. 各メッセージについて：
-   - `mcp__gmail__get_message` で本文取得
-   - 添付があれば `mcp__gmail__get_attachment` で取得し、PDFは `pdf-parse` 等でテキスト化
+   - `mcp__gmail__read_email` で本文取得
+   - 添付があれば `mcp__gmail__download_attachment` で取得し、PDFは `pdf-parse` 等でテキスト化
 4. ダンプ先： `trips/<slug>/raw/<messageId>.json` （メタ＋本文＋添付パス）
 
 raw ディレクトリは `.gitignore` 対象。
@@ -107,7 +107,7 @@ type RawExpense = {
 - 対象シートの現在の行範囲（`B19:I80` など、読み取りのみ）
 - 上書きされる行範囲
 
-ユーザーが明示的に許可するまで `mcp__gsheets__sheets_update_values` を呼ばない。
+ユーザーが明示的に許可するまで `mcp__gsheets__update_cells` / `batch_update_cells` を呼ばない。
 
 ---
 
@@ -116,7 +116,8 @@ type RawExpense = {
 - 範囲： `<sheetName>!B19:I<最終行>`
 - I列（計算対象外）は明示的に `FALSE`
 - 数式は使わず値で書く
-- 書き込み後、`mcp__gsheets__sheets_get_values` で同じ範囲を読み返して件数・合計が一致することを確認
+- ツール: `mcp__gsheets__update_cells`（単一範囲）または `batch_update_cells`（複数範囲）
+- 書き込み後、`mcp__gsheets__get_sheet_data` で同じ範囲を読み返して件数・合計が一致することを確認
 
 ---
 

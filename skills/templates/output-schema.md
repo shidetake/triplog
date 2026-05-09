@@ -44,6 +44,6 @@
 
 ## 書き込み
 
-- API: `mcp__gsheets__sheets_update_values`
+- API: `mcp__gsheets__update_cells`（または複数範囲なら `batch_update_cells`）
 - 範囲: `<sheetName>!B19:I<最終行>`
 - 値は2次元配列。文字列は文字列、数値は数値、`"BANK"` は文字列、`FALSE` はブール型または文字列 `"FALSE"` のいずれか（シート側で boolean として解釈されるよう要確認）

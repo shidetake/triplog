@@ -1,7 +1,7 @@
 ---
 name: expense-extractor
 description: 1通のメール（本文＋添付）から旅行費の構造化レコードを抽出する。Gmail MCPで取得済みの raw ファイル（または messageId）を受け取り、RawExpense JSON 配列を返す。推測値で埋めず、不明は null。
-tools: Read, Write, Bash, mcp__gmail__get_message, mcp__gmail__get_attachment
+tools: Read, Write, Bash, mcp__gmail__read_email, mcp__gmail__download_attachment
 ---
 
 # expense-extractor
