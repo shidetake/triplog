@@ -1,19 +1,36 @@
 import type { Category, RawExpense } from "./types.ts";
 
 const MERCHANT_CATEGORY_MAP: Array<[RegExp, Category]> = [
-  // 渡航
-  [/delta|ana\b|jal\b|hawaiian air|united|american air|jetblue/i, "渡航"],
-  [/narita express|nex|n'ex|airport limousine|京成スカイライナー/i, "渡航"],
-  // 宿泊
-  [/royal hawaiian|halekulani|marriott|hilton|hyatt|sheraton|moana surfrider/i, "宿泊"],
+  // 渡航（航空会社）— ana/jal は前後にスペースのみで囲まれた完全一致だけ
+  [/\bdelta\b|(?<![A-Z])(ANA|JAL)(?![A-Z])|hawaiian air|united air|american air|jetblue/i, "渡航"],
+  [/narita express|\bnex\b|n'ex|airport limousine|京成スカイライナー/i, "渡航"],
+
+  // 飲食（先に拾う）— レストラン・バー・カフェ・ベーカリー・ブルワリー
+  [
+    /howzit|hana koa|hula grill|yard house|island vintage|orchids|brewing|cafe|coffee|starbucks|restaurant|leahi|smash burger|tutu|treats|bakery|nalu|moni\s|kai coffee|honolulu coffee|beach bar|surf lanai|mai tai|village bottle|uloha|hitea|the bus drink/i,
+    "飲食",
+  ],
+
+  // 宿泊（ホテル名のみ。レストランは飲食で既に拾われる前提）
+  [/^(the\s+)?royal hawaiian\s*$|^(the\s+)?royal hawaiian\s+(hotel|resort|waikiki)|halekulani(?!\s+orchids)|\bmarriott\b|\bhilton\b|\bhyatt\b|moana surfrider(?!.*(coffee|kiosk))/i, "宿泊"],
+
   // 現地移動
   [/uber|lyft|taxi|bus pass|the bus|holo card/i, "現地移動"],
-  // 飲食
-  [/howzit|hana koa|hula grill|yard house|island vintage|orchids|brewing|bar\b|cafe|coffee|starbucks|restaurant/i, "飲食"],
-  // エンタメ
-  [/star of honolulu|aquarium|polynesian cultural|luau|waikiki shell/i, "エンタメ"],
+
+  // エンタメ（ツアー・入場料・アクティビティ）
+  [/star of honolulu|aquarium|polynesian cultural|luau|waikiki shell|diamond head|hanauma|dive oahu|snorkel|ssa\b/i, "エンタメ"],
+
   // 通信
-  [/wifi|pocketalk|wi-?fi|t-?mobile|verizon|at&t|ローミング/i, "通信"],
+  [/wifi|pocketalk|wi-?fi|t-?mobile|verizon|at&t|ローミング|ubigi|transatel/i, "通信"],
+
+  // お土産（土産物・ホテルギフトショップ・特産品）
+  [/honolulu cookie|hawaii tile|trh inspired|royal hawaiian center|royal hawaiian c\b|ala moana center|abc store|abc\s*#|aloha collection|kahala\s*-\s*royal/i, "お土産"],
+
+  // 衣服
+  [/uniqlo|alo yoga|alo-yoga|alo　yoga|patagonia|lululemon|nike|adidas/i, "衣服"],
+
+  // 日用品（ドラッグストア・スーパー）
+  [/longs|cvs|walgreens|target|walmart|whole ?foods|whole ?fds|safeway|times super|don ?quijote|waikiki market/i, "日用品"],
 ];
 
 export function suggestCategory(expense: RawExpense): Category | null {
@@ -30,6 +47,6 @@ export function categorize(expenses: RawExpense[]): RawExpense[] {
     if (e.category) return e;
     const suggested = suggestCategory(e);
     if (suggested) return { ...e, category: suggested };
-    return e; // カテゴリ未確定 → ユーザー判断に委ねる
+    return e;
   });
 }

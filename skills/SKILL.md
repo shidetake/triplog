@@ -1,6 +1,6 @@
 # SKILL — 旅行収支抽出メイン手順
 
-`/trip <slug>` で1旅行を処理する際の標準手順。
+`/trip <slug>` で1旅行を処理する標準手順。
 個別ルールは `skills/rules/*.md`、出力フォーマットは `skills/templates/output-schema.md` を参照。
 
 ---
@@ -15,28 +15,23 @@
 
 ## 1. config.json を読み込む
 
-最低限必要なフィールド：
+主要フィールド：
 
 ```json
 {
   "slug": "2026-04-hawaii",
-  "spreadsheetId": "1QEUhnI0BQjfrSXbEmS5WjkGcLTYGXU9D3fNSe59cXV4",
+  "spreadsheetId": "...",
   "sheetName": "2026-04Hawaii",
   "headerRow": 18,
   "dataStartRow": 19,
   "writeRange": "B19:I",
   "period": { "start": "2026-04-28", "end": "2026-05-05" },
-  "originAirport": "NRT",
-  "destinationAirport": "HNL",
   "primaryStay": "Royal Hawaiian",
-  "queries": [
-    "from:(no-reply OR receipt OR receipts) \"$\" after:2026/04/28 before:2026/05/06",
-    "from:banking ご利用 after:2026/04/28 before:2026/05/07",
-    "from:banking ご利用金額確定 after:2026/04/28 before:2026/05/07",
-    "from:deltaairlines receipt SASAKI",
-    "from:uber.com receipt after:2026/04/27 before:2026/05/07",
-    "subject:(receipt OR confirmation OR folio) after:2026/04/28 before:2026/05/06"
-  ],
+  "queries": [...],
+  "noiseFilters": {
+    "fromDomains": [...],
+    "subjectPatterns": [...]
+  },
   "fxRateOverride": null
 }
 ```
@@ -45,47 +40,59 @@
 
 ## 2. Gmail から候補メールを集める
 
-1. `config.queries` を順に `mcp__gmail__search_emails` に投げる
-2. messageId のセットで重複排除
-3. 各メッセージについて：
-   - `mcp__gmail__read_email` で本文取得
-   - 添付があれば `mcp__gmail__download_attachment` で取得し、PDFは `pdf-parse` 等でテキスト化
-4. ダンプ先： `trips/<slug>/raw/<messageId>.json` （メタ＋本文＋添付パス）
-
-raw ディレクトリは `.gitignore` 対象。
+`config.queries` を順に `mcp__gmail__search_emails` に投げ、`{messageId, from, subject, date}` のメタリストを作る。重複 messageId は集約。
 
 ---
 
-## 3. メールごとに構造化JSONへ抽出
+## 2.5. ノイズ除去（A2）
 
-`@expense-extractor` サブエージェントを使う。1メール1呼び出し、入力は raw ファイル、出力は次のスキーマ：
-
-```ts
-type RawExpense = {
-  source: "sony-bank-auth" | "sony-bank-confirm" | "receipt-email" | "hotel-folio" | "airline" | "rideshare" | "other";
-  messageId: string;
-  occurredAt: string;        // ISO8601 利用日時（不明なら日付のみ "YYYY-MM-DD"）
-  merchantRaw: string;
-  merchant: string;          // 正規化後の表示用（"TST*", "SQ*" 等は除去）
-  amountLocal: number | null;
-  currencyLocal: string;     // "USD", "JPY"
-  amountJPY: number | null;  // Sony銀行確定額がある場合のみ
-  tipLocal: number | null;
-  category?: string;         // 確証ある場合のみ。なければ後段で推定
-  detail?: string;           // メニュー名・区間・部屋種別など
-  notes?: string;
-}
-```
-
-抽出が困難なフィールドは `null` のまま残す（推測しない）。
-
-中間ファイル： `trips/<slug>/raw/extracted.json`（RawExpense配列）
+`scripts/src/filter.ts` の `applyNoiseFilters()` を使い、`config.noiseFilters` でメッセージを間引く。
+落ちたものは `trips/<slug>/raw/filtered-out.json` に reason 付きで残す（後で誤フィルタを発見したら config を更新）。
 
 ---
 
-## 4. 正規化パイプライン
+## 3. raw ダンプ（Gmail → ローカル）
 
-`scripts/` の関数を順に通す。pure function なので CLI でもインライン Node でも OK。
+残ったメッセージそれぞれについて：
+
+1. `mcp__gmail__read_email` で本文取得
+2. PDF 添付があれば `mcp__gmail__download_attachment` で `trips/<slug>/raw/<messageId>-<filename>.pdf` に保存
+3. PDF は `scripts/src/parsers/marriott-folio.ts` などで `pdf-parse` 経由でテキスト化（`textContent` フィールドに収納）
+4. ダンプ先: `trips/<slug>/raw/<messageId>.json`（`RawMessage` 型）
+
+巨大 HTML（Uber 等）は本文丸ごと保存して構わない（後段の `stripHtml()` で処理）。
+このダンプは subagent に任せて context を汚さないのがおすすめ（大量の本文が main context を埋めるのを避ける）。
+
+---
+
+## 4. 構造化抽出（Deterministic + Agent fallback）
+
+### 4.1 Deterministic パース
+
+`npm run extract <slug>` を実行：
+
+- `trips/<slug>/raw/*.json` を全部読む
+- `parsers/route.ts` の `detectSource()` でソース判定
+- 既知ソースは専用パーサで `RawExpense` 化：
+  - `parsers/sony-bank.ts`（auth/confirm 両対応）
+  - `parsers/toast.ts`（toasttab.com）
+  - `parsers/square.ts`（messaging.squareup.com）
+  - `parsers/uber.ts`（noreply@uber.com、日本語Subject）
+  - `parsers/marriott-folio.ts`（PDF テキスト前提）
+- 出力:
+  - `trips/<slug>/raw/extracted.json`（パース成功した `RawExpense[]`）
+  - `trips/<slug>/raw/needs-agent.json`（パース失敗・未対応ソースの一覧）
+
+### 4.2 Agent フォールバック
+
+`needs-agent.json` が空でなければ、各メッセージに対して `@expense-extractor` サブエージェントを呼ぶ（`messageId` 渡し）。エージェントは raw を読み直して `RawExpense[]` を返す。
+返ってきた配列を `extracted.json` に追記。
+
+---
+
+## 5. 正規化パイプライン
+
+`npm run pipeline <slug>` を実行：
 
 1. `dedup` — `skills/rules/dedup-rules.md`
 2. `tipMerge` — `skills/rules/tip-rules.md`
@@ -98,7 +105,7 @@ type RawExpense = {
 
 ---
 
-## 5. ユーザー確認
+## 6. ユーザー確認
 
 書き込み前に必ず以下を提示：
 
@@ -111,20 +118,13 @@ type RawExpense = {
 
 ---
 
-## 6. シート書き込み
+## 7. シート書き込み
 
 - 範囲： `<sheetName>!B19:I<最終行>`
 - I列（計算対象外）は明示的に `FALSE`
 - 数式は使わず値で書く
-- ツール: `mcp__gsheets__update_cells`（単一範囲）または `batch_update_cells`（複数範囲）
+- ツール: `mcp__gsheets__update_cells`（単一範囲）または `mcp__gsheets__batch_update_cells`（複数範囲）
 - 書き込み後、`mcp__gsheets__get_sheet_data` で同じ範囲を読み返して件数・合計が一致することを確認
-
----
-
-## 7. 後片付け
-
-- `output.tsv` をコミット対象に（`.gitignore` で除外しているので明示的に `git add -f` するか、レビュー用のコピーを別パスに）
-- `raw/` は `.gitignore` 対象のままでOK
 
 ---
 

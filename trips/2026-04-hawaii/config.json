@@ -14,8 +14,56 @@
     "from:banking ご利用 after:2026/04/28 before:2026/05/07",
     "from:banking ご利用金額確定 after:2026/04/28 before:2026/05/07",
     "from:deltaairlines receipt SASAKI",
-    "from:uber.com receipt after:2026/04/27 before:2026/05/07",
-    "subject:(receipt OR confirmation OR folio) after:2026/04/28 before:2026/05/06"
+    "from:noreply@uber.com after:2026/04/27 before:2026/05/07",
+    "subject:(receipt OR confirmation OR folio) after:2026/04/28 before:2026/05/06",
+    "Royal Hawaiian after:2026/04/27 before:2026/05/15"
   ],
-  "fxRateOverride": null
+  "noiseFilters": {
+    "fromDomains": [
+      "note.com",
+      "noreply@github.com",
+      "digital-no-reply@amazon.co.jp",
+      "no-reply@amazon.co.jp",
+      "algolia.com",
+      "feedback-marriott.com",
+      "email-marriott.com",
+      "no-reply@accounts.google.com",
+      "ma.sumitomolife.co.jp",
+      "ml.spacemarket.com",
+      "email.openai.com",
+      "noreply-apps-scripts-notifications@google.com",
+      "ma.sonybank.jp",
+      "mail.anthropic.com",
+      "elsanow.io",
+      "calendar-notification@google.com",
+      "no-reply-meisai@dpoint.docomo.ne.jp"
+    ],
+    "subjectPatterns": [
+      "^Welcome to ",
+      "You've unlocked",
+      "You're in! Welcome",
+      "Tell us about your stay",
+      "How was ",
+      "let .* know you are coming",
+      "Check in now",
+      "Dependabot alerts",
+      "Algolia Usage",
+      "Action Required",
+      "次回の配送",
+      "価格の変更",
+      "Summary of failures",
+      "Happy Birthday",
+      "資産形成",
+      "メルマガ更新",
+      "本人確認機能",
+      "ChatGPT Images",
+      "no longer recoverable",
+      "データプラン",
+      "Waiver signature confirmation",
+      "本人確認",
+      "OAuth application",
+      "Eサポ"
+    ]
+  },
+  "fxRateOverride": 149.75
 }

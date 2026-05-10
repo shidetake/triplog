@@ -54,6 +54,11 @@ export type NormalizedExpense = RawExpense & {
   excluded: boolean; // I列 計算対象外
 };
 
+export type NoiseFilters = {
+  fromDomains: string[];
+  subjectPatterns: string[];
+};
+
 export type TripConfig = {
   slug: string;
   spreadsheetId: string;
@@ -66,5 +71,26 @@ export type TripConfig = {
   destinationAirport?: string;
   primaryStay?: string;
   queries: string[];
+  noiseFilters?: NoiseFilters;
   fxRateOverride?: number | null;
 };
+
+export type RawMessage = {
+  messageId: string;
+  from: string;
+  subject: string;
+  date: string; // RFC 2822 / ISO
+  body: string; // plain text or stripped HTML
+  bodyRaw?: string; // original (HTML or plain)
+  attachments?: Array<{
+    filename: string;
+    mimeType: string;
+    path: string; // relative to trip dir
+    textContent?: string; // extracted text for PDFs etc.
+  }>;
+};
+
+export type ParseResult =
+  | { ok: true; expense: RawExpense }
+  | { ok: false; reason: string }; // skip silently
+

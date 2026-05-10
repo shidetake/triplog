@@ -1,10 +1,12 @@
 ---
 name: expense-extractor
-description: 1通のメール（本文＋添付）から旅行費の構造化レコードを抽出する。Gmail MCPで取得済みの raw ファイル（または messageId）を受け取り、RawExpense JSON 配列を返す。推測値で埋めず、不明は null。
+description: deterministic パーサがカバーしないメールから旅行費の構造化レコードを抽出する fallback エージェント。Gmail MCPで取得済みの raw ファイル（または messageId）を受け取り、RawExpense JSON 配列を返す。推測値で埋めず、不明は null。
 tools: Read, Write, Bash, mcp__gmail__read_email, mcp__gmail__download_attachment
 ---
 
 # expense-extractor
+
+`scripts/src/parsers/` にある deterministic パーサ（Sony bank / Toast / Square / Uber / Marriott Folio）でカバーできなかったメッセージを LLM で読み解き、`RawExpense[]` として抽出する **fallback** エージェント。
 
 メール1通を読み、その中に含まれる **すべての** 決済イベントを `RawExpense` の JSON 配列として抽出する。
 ホテルFolio のように1通に複数行が含まれることがあるので **常に配列で返す**。

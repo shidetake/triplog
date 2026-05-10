@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p .",
-    "pipeline": "node --experimental-strip-types src/cli.ts"
+    "pipeline": "node --experimental-strip-types src/cli.ts",
+    "extract": "node --experimental-strip-types src/extract.ts",
+    "auth:sheets": "node src/auth-sheets.mjs"
+  },
+  "dependencies": {
+    "google-auth-library": "^10.5.0",
+    "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

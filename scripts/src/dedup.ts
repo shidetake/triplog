@@ -10,14 +10,32 @@ const SOURCE_PRIORITY: Record<Source, number> = {
   other: 0,
 };
 
-const PREFIX_RE = /^(TST\*|SQ\*|SP\*|SQU\*|WPY\*|PAYPAL\s*\*?\s*|PY\*)/i;
+const PREFIX_RE = /^(TST\*|SQ\s*\*|SP\s+|SQU\*|WPY\*|PAYPAL\s*\*?\s*|PY\*|UBR\*\s*|FH\*\s*|PENDING\.\s*|PENDING\s+|\*)/i;
+// Trailing patterns to strip: store numbers, branch suffixes, etc.
+const SUFFIX_RES = [
+  /\s+#?\d{4,}$/,
+  /\s+-\s+[A-Z][A-Z\s]*$/,
+  /\s+\d{1,3}$/,
+];
 
 export function normalizeMerchant(name: string): string {
-  return name
+  let n = name
     .replace(PREFIX_RE, "")
+    .replace(/[#＃]/g, "#")
+    .replace(/[-–—]/g, " ") // dash variants → space
+    .replace(/'’/g, "'")
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
+  for (const re of SUFFIX_RES) n = n.replace(re, "").trim();
+  return n;
+}
+
+// Fuzzy match: one is a prefix of the other (after a common min length)
+function isFuzzyMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 6 || b.length < 6) return false;
+  return a.startsWith(b) || b.startsWith(a);
 }
 
 export function withinAmountTolerance(
@@ -45,7 +63,7 @@ export function withinTimeWindow(
 
 function isSameTransaction(a: RawExpense, b: RawExpense): boolean {
   if (a.currencyLocal !== b.currencyLocal) return false;
-  if (normalizeMerchant(a.merchantRaw) !== normalizeMerchant(b.merchantRaw)) {
+  if (!isFuzzyMatch(normalizeMerchant(a.merchantRaw), normalizeMerchant(b.merchantRaw))) {
     return false;
   }
   if (!withinAmountTolerance(a.amountLocal, b.amountLocal)) return false;
