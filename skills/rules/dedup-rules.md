@@ -29,6 +29,29 @@ Sony銀行は同一決済について
 
 3つすべて満たさない場合は別取引として扱う。
 
+### 同 source × 異 messageId は別ルール
+
+同じ source（receipt-email × receipt-email、sony-bank-auth × auth など）で messageId が異なる場合は **「Gmail の重複コピー」のときだけ merge** する。条件全て:
+
+- 金額完全一致（±$0.01）
+- 時刻 1 分以内
+- detail がコンフリクトしない（両方非空で異なれば別取引、Delta の HIDETAKE / NAE 等を区別）
+- notes がコンフリクトしない（Sony 銀行の承認番号、Delta のチケット番号等で別取引判定）
+
+これで Uber が同一トリップを 2-3 通受信するケースは merge し、同店舗・近額・短時間内の別注文（HOWZIT $10.42 の Hawaiian Time WC IPA / $11.42 の Howzit Light など）は別レコードとして残せる。
+
+### Square の split-tip パターン（pre-dedup ステップ）
+
+Square は店内決済時に「ベース額」、ユーザーがチップを後で追加した時に「チップ額」を別決済として走らせる。Sony 銀行はそれぞれ別メールで届くため:
+
+- `sony-bank-auth`: ベース（チップ前）
+- `sony-bank-confirm`: チップ部分のみ
+- `receipt-email` (Square): チップ込み最終 total
+
+dedup の前段で `applySplitTipMatch()` が動き、`auth.amount + confirm.amount = receipt.amount`（許容 ±$0.05）の3点セットを検出して receipt 行に統合（`tipLocal` に confirm 額）。マーチャント比較は fuzzy（Sony 銀行の truncated 表記を吸収）、時刻ウィンドウは 72h。
+
+receipt が存在しない単独の auth + confirm ペアは敢えて統合せず別行で残す（推測を避ける）。
+
 ---
 
 ## 採用優先順位（同一取引内での代表選定）

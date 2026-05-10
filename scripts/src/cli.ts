@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RawExpense, TripConfig } from "./types.ts";
+import { applySplitTipMatch } from "./split-tip.ts";
 import { dedup } from "./dedup.ts";
 import { tipMerge } from "./tip-merge.ts";
 import { categorize } from "./categorize.ts";
@@ -27,7 +28,8 @@ const raw: RawExpense[] = JSON.parse(
   readFileSync(resolve(tripDir, "raw/extracted.json"), "utf8"),
 );
 
-const deduped = dedup(raw);
+const splitTipped = applySplitTipMatch(raw);
+const deduped = dedup(splitTipped);
 const tipped = tipMerge(deduped);
 const categorized = categorize(tipped);
 

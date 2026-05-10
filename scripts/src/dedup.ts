@@ -37,7 +37,7 @@ export function normalizeMerchant(name: string): string {
 //   3) 単語集合の包含（短い側が2語以上で、その単語が全部長い側に含まれる）
 //      例: "ISLAND VINTAGE WINE" ⊂ "IVWB ROYAL HAWAIIAN ISLAND VINTAGE WINE BAR"
 //      金額±25% / 時刻±72h と AND で評価されるので、誤マージは現実的にほぼ起きない。
-function isFuzzyMatch(a: string, b: string): boolean {
+export function isFuzzyMatch(a: string, b: string): boolean {
   if (a === b) return true;
   if (a.length >= 6 && b.length >= 6 && (a.startsWith(b) || b.startsWith(a))) return true;
   const wordsA = a.split(/\s+/).filter(Boolean);
@@ -76,6 +76,26 @@ function isSameTransaction(a: RawExpense, b: RawExpense): boolean {
   if (!isFuzzyMatch(normalizeMerchant(a.merchantRaw), normalizeMerchant(b.merchantRaw))) {
     return false;
   }
+  // 同 source × 異 messageId は「Gmail の重複コピー」のみ merge する厳格モード:
+  //   - 金額が完全一致 (±$0.01)
+  //   - 時刻が 1 分以内
+  //   - detail がコンフリクトしない（両方非空で異なる場合は別取引: Delta の HIDETAKE/NAE 等）
+  //   - notes がコンフリクトしない（両方非空で異なる場合は別取引: Sony 銀行の承認番号、Delta のチケット番号等）
+  // これで Uber の重複レシート（同一トリップが 2-3 通届くケース）は merge する一方、
+  // 同店舗・同額・短時間内の別注文（Sony 確定 $1 が複数 / Delta の連名 / HOWZIT $10.42 vs $11.42）は別レコードとして残せる。
+  if (a.source === b.source && a.messageId !== b.messageId) {
+    if (a.amountLocal == null || b.amountLocal == null) return false;
+    if (Math.abs(a.amountLocal - b.amountLocal) > 0.01) return false;
+    if (!withinTimeWindow(a.occurredAt, b.occurredAt, 1 / 60)) return false;
+    const da = (a.detail ?? "").trim();
+    const db = (b.detail ?? "").trim();
+    if (da && db && da !== db) return false;
+    const na = (a.notes ?? "").trim();
+    const nb = (b.notes ?? "").trim();
+    if (na && nb && na !== nb) return false;
+    return true;
+  }
+  // 異 source 間（auth + receipt + confirm 系）: 既存のゆるい条件
   if (!withinAmountTolerance(a.amountLocal, b.amountLocal)) return false;
   if (!withinTimeWindow(a.occurredAt, b.occurredAt)) return false;
   return true;
