@@ -33,13 +33,15 @@ argument-hint: <slug> [--reuse-raw | --force-refetch]
     - 対象シートの現在の `B19:I<最終行>` 範囲とその行数
     - 上書きされる範囲
     - reuse-raw で動かしたか / Gmail を再取得したか
-10. ユーザーが明示的に「書き込んでOK」と承認したら `mcp__gsheets__update_cells` で `<sheetName>!B19:I<最終行>` を一括更新
+10. ユーザーが明示的に「書き込んでOK」と承認したら `mcp__gsheets__batch_update_cells` で **B19:F<最終行> と H19:I<最終行> の2範囲** を一度に更新（**G列はシート側の formula `=IF(ISBLANK($F),"",$H/$F)` で auto 計算されるので絶対に書かない**。JPY 通貨の行は F を空文字、H に円額のみ）
 11. 直後に同範囲を `mcp__gsheets__get_sheet_data` で読み返し、行数と合計が一致することを確認
 12. 結果サマリ（書き込み済み件数、カテゴリ別合計）をユーザーに報告
 
 ## 厳守事項
 
 - `config.sheetName` 以外のシートへの書き込み・クリア・削除は絶対禁止
+- **G 列（レート）には絶対に書き込まない**（シート側の formula が壊れる）。書き込みは `batch_update_cells` で B:F と H:I の2範囲に分ける
+- **JPY 通貨の行は F 列も空にする**。H にだけ円額を書く
 - 推測値で欄を埋めない（不明は `null`、TSV化時は空欄）
 - 確定日ベースの記録NG。必ず利用日
 - ユーザーの承認なしに `update_cells` / `batch_update_cells` を呼ばない

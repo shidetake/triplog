@@ -2,23 +2,32 @@
 
 ヘッダー行は **18行目**、データは **19行目** から。
 
-| 列 | 名称 | 型 | 例 | 備考 |
+| 列 | 名称 | 型 | 書き込み | 備考 |
 |---|---|---|---|---|
-| B | 日付 | `YYYY/MM/DD` | `2026/04/28` | 利用日（確定日ではない） |
-| C | カテゴリ | enum | `飲食` | `categories.md` の語彙のみ |
-| D | 利用先 | string | `Howzit Brewing` | カード明細の生表記(`TST*`等)は使わない |
-| E | 詳細 | string | `IPA Pint, Loco Moco（チップ$12.06 / 18%）` | メニュー名・商品名・移動区間など |
-| F | 現地価格(USD) | number | `79.08` | 現地通貨での確定額（チップ込み）。小数2桁 |
-| G | レート | number or `"BANK"` | `BANK` | Sony銀行確定円額が取れたら `"BANK"` |
-| H | 円(JPY) | integer | `11842` | 数式ではなく値で書く。整数 |
-| I | 計算対象外 | boolean | `FALSE` | 集計除外フラグ。明示的に `FALSE` を入れる |
+| B | 日付 | `YYYY/MM/DD` | ✓ | 利用日（確定日ではない） |
+| C | カテゴリ | enum | ✓ | `categories.md` の語彙のみ |
+| D | 利用先 | string | ✓ | カード明細の生表記(`TST*`等)は使わない |
+| E | 詳細 | string | ✓ | 品名のみ（チップ・タックスは入れない） |
+| F | 現地価格 | number | △ | 外貨行は数値。**JPY 行は空** |
+| G | レート | number | **✗ 書かない** | シート側に formula `=IF(ISBLANK($F),"",$H/$F)` が入っている。F と H から auto 計算 |
+| H | 円 | integer | ✓ | 整数。値で書く（数式不可） |
+| I | 計算対象外 | boolean | ✓ | 集計除外フラグ。明示的に `FALSE` |
+
+---
+
+## 重要な書き込みルール
+
+1. **G 列（レート）には絶対に書き込まない**。formula が壊れる。書き込み時は `mcp__gsheets__batch_update_cells` で `B:F` と `H:I` の2範囲に分けて書く（G は touch しない）。
+2. **JPY 行は F（現地価格）も空**。H にだけ円額を書く。formula は F が空のとき G を空のままにする。
+3. **「BANK」のような文字列を G に書くのは禁止**。formula を破壊する。
+4. detail 列にチップ・タックスを入れない（user 指示: 情報量0）。
 
 ---
 
 ## 詳細列(E) の書き方
 
-- **飲食**: 注文メニュー（カンマ区切り） + チップ情報
-  - 例: `IPA Pint, Loco Moco（チップ$12.06 / 18%）`
+- **飲食**: 注文メニュー（カンマ区切り）。**チップ・タックスは含めない**
+  - 例: `IPA Pint, Loco Moco`
 - **小売**: 購入商品名（複数あればカンマ区切り）
   - 例: `アロハシャツ M, ククイナッツレイ`
 - **現地移動**: 区間 + 時刻
@@ -30,20 +39,22 @@
 
 ---
 
-## TSV 出力例
+## TSV / シート出力例
 
 ```
-2026/04/28	渡航	JR成田エクスプレス	東京→成田空港	0.00	1	3070	FALSE
-2026/04/28	渡航	Delta DL182	NRT→HNL ビジネス	2126.00	BANK	318900	FALSE
-2026/04/28	現地移動	Uber	HNL空港→ワイキキ 8:26AM	28.45	BANK	4263	FALSE
-2026/04/28	宿泊	Royal Hawaiian	7泊 オーシャンビュー (Resort Fee/TAT/HCT込)	5234.78	BANK	784550	FALSE
-2026/04/29	飲食	Howzit Brewing	IPA Pint, Loco Moco（チップ$12.06 / 18%）	79.08	BANK	11842	FALSE
+2026/04/28	渡航	JR成田エクスプレス	東京→成田空港		    	3070	FALSE
+2026/04/28	渡航	DELTA	NRT→HNL ビジネス	2126		318900	FALSE
+2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45		4263	FALSE
+2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78		784550	FALSE
+2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08		11842	FALSE
 ```
+
+JPY 行は F が空、外貨行は F に数値、G はどちらも常に空（シートの formula が auto 計算）。
 
 ---
 
 ## 書き込み
 
-- API: `mcp__gsheets__update_cells`（または複数範囲なら `batch_update_cells`）
-- 範囲: `<sheetName>!B19:I<最終行>`
-- 値は2次元配列。文字列は文字列、数値は数値、`"BANK"` は文字列、`FALSE` はブール型または文字列 `"FALSE"` のいずれか（シート側で boolean として解釈されるよう要確認）
+- API: `mcp__gsheets__batch_update_cells`（B:F と H:I の2範囲を別 entry で同時更新）
+- `mcp__gsheets__update_cells` で B:I を一発書きするのは G 列の formula を上書きするので **使用禁止**
+- 値は2次元配列。文字列は文字列、数値は数値、空セルは空文字列 `""`、boolean は `"FALSE"` 等の文字列
