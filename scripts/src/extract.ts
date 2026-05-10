@@ -63,12 +63,25 @@ for (const msg of messages) {
   }
 
   const e = result.expense;
+  // 並び替え用の UTC タイムスタンプを email Date から付与
+  let sortKey: string | undefined;
+  try {
+    const ts = new Date(msg.date).toISOString();
+    sortKey = ts;
+  } catch {
+    /* ignore parse errors */
+  }
+  if (sortKey) e.sortKey = sortKey;
+
   // Handle marriott folio fan-out
   if (e.notes?.startsWith("__FANOUT__:")) {
     const fan = JSON.parse(e.notes.slice("__FANOUT__:".length)) as RawExpense[];
     delete e.notes;
     expenses.push(e);
-    expenses.push(...fan);
+    for (const f of fan) {
+      if (sortKey && !f.sortKey) f.sortKey = sortKey;
+      expenses.push(f);
+    }
   } else {
     expenses.push(e);
   }

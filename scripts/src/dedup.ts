@@ -116,17 +116,10 @@ function pickRepresentative(group: RawExpense[]): RawExpense {
     rep.amountJPY = confirm.amountJPY;
   }
 
-  // occurredAt: 速報側（auth）優先、なければ最も早い日付
-  const auth = group.find((g) => g.source === "sony-bank-auth");
-  if (auth?.occurredAt) {
-    rep.occurredAt = auth.occurredAt;
-  } else {
-    const earliest = group
-      .map((g) => g.occurredAt)
-      .filter(Boolean)
-      .sort()[0];
-    if (earliest) rep.occurredAt = earliest;
-  }
+  // occurredAt は表示用の現地時刻なので、上位 source（receipt-email 等、メール本文を直接パース）を尊重する。
+  // 旧実装では Sony 銀行 auth の "カード利用日" (JST) で上書きしていたが、
+  // それだと Hawaii 取引が 1日ずれて表示されるため廃止（user feedback: 現地時刻で表示）。
+  // sortKey は時系列順のため UTC ベース、これは sorted[0] のものをそのまま rep が引き継ぐ。
 
   // detail: 上位ソースのものを優先（既にrep側にあればそのまま）
   if (!rep.detail) {

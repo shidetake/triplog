@@ -6,19 +6,40 @@ function formatDate(iso: string): string {
   return datePart.replace(/-/g, "/");
 }
 
+// sortKey が occurredAt の日付から ±2日以内なら信頼する。
+// 例: HONOLULU COOKIE — occurredAt=2026-05-04T10:58 (HST), sortKey=2026-05-04T21:03Z → 0日差 ✓ 採用
+// 例: Hawaii 午後 — occurredAt=2026-04-28T17:21 (HST), sortKey=2026-04-29T03:21Z → 1日差 (UTC越境) ✓ 採用
+// 例: Delta (事前購入) — occurredAt=2026-05-04, sortKey=2025-11-28T... → ~5ヶ月差 ✗ fallback (occurredAt で並べる)
+function dateDayDiff(a: string, b: string): number {
+  const ta = new Date(a.slice(0, 10) + "T00:00:00Z").getTime();
+  const tb = new Date(b.slice(0, 10) + "T00:00:00Z").getTime();
+  return Math.abs(ta - tb) / (24 * 3600 * 1000);
+}
+function effectiveSortKey(e: NormalizedExpense): string {
+  if (e.sortKey && dateDayDiff(e.sortKey, e.occurredAt) <= 2) {
+    return e.sortKey;
+  }
+  // 時刻不明 (date-only "YYYY-MM-DD") は同日の末尾に寄せる:
+  // 旅行記の自然順は「朝の取引 → 夜の取引 → ホテル check-in (date-only)」になる方が読みやすい。
+  if (e.occurredAt.length <= 10) return e.occurredAt + "T99:99:99Z";
+  return e.occurredAt;
+}
+
 function compareExpenses(a: NormalizedExpense, b: NormalizedExpense): number {
+  // 2段階ソート:
+  //   L1: occurredAt の日付部分（現地表示日）。日付が違えば普通に日付順
+  //   L2: 同じ表示日内では effectiveSortKey で時系列
+  // 例: 4/28 京都 Uber (JST 11:44 = UTC 02:44) と 4/28 ハワイ Uber (HST 08:32 = UTC 18:32) は両方 "2026-04-28"。
+  // L2 で UTC 比較すると Kyoto が先になる（user feedback: トランザクション順を優先）。
   const dateA = a.occurredAt.slice(0, 10);
   const dateB = b.occurredAt.slice(0, 10);
   if (dateA !== dateB) return dateA < dateB ? -1 : 1;
 
-  // 時刻あり優先 / 同日内は時刻昇順
-  const timeA = a.occurredAt.length > 10 ? a.occurredAt : "9999";
-  const timeB = b.occurredAt.length > 10 ? b.occurredAt : "9999";
-  if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+  const keyA = effectiveSortKey(a);
+  const keyB = effectiveSortKey(b);
+  if (keyA !== keyB) return keyA < keyB ? -1 : 1;
 
-  const catA = CATEGORY_ORDER.indexOf(a.category);
-  const catB = CATEGORY_ORDER.indexOf(b.category);
-  return catA - catB;
+  return CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category);
 }
 
 export function sortExpenses(expenses: NormalizedExpense[]): NormalizedExpense[] {

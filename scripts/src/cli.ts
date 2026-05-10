@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { RawExpense, TripConfig } from "./types.ts";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import type { RawExpense, RawMessage, TripConfig } from "./types.ts";
 import { dedup } from "./dedup.ts";
 import { mergeSonyAuthConfirmByApproval, tipMerge } from "./tip-merge.ts";
 import { categorize } from "./categorize.ts";
@@ -26,6 +26,44 @@ const config: TripConfig = JSON.parse(
 const raw: RawExpense[] = JSON.parse(
   readFileSync(resolve(tripDir, "raw/extracted.json"), "utf8"),
 );
+
+// agent-fallback など sortKey が未設定のレコードに対し、raw/<messageId>.json から email date を引いて backfill。
+// fanout のメッセージID（"<base>#<suffix>"）は base 部分でルックアップ。
+const rawDir = resolve(tripDir, "raw");
+const meta = new Set([
+  "extracted.json",
+  "needs-agent.json",
+  "filtered-out.json",
+  "messages.json",
+  "kept.json",
+  "download-errors.json",
+  "html-errors.json",
+  "agent-fallback.json",
+]);
+const rawByMid = new Map<string, RawMessage>();
+for (const f of readdirSync(rawDir)) {
+  if (!f.endsWith(".json") || meta.has(f)) continue;
+  const fp = join(rawDir, f);
+  if (!statSync(fp).isFile()) continue;
+  try {
+    const m = JSON.parse(readFileSync(fp, "utf8"));
+    if (m.messageId) rawByMid.set(m.messageId, m);
+  } catch {
+    /* skip */
+  }
+}
+for (const e of raw) {
+  if (e.sortKey) continue;
+  const baseId = e.messageId.split("#")[0]!;
+  const m = rawByMid.get(baseId);
+  if (m?.date) {
+    try {
+      e.sortKey = new Date(m.date).toISOString();
+    } catch {
+      /* skip */
+    }
+  }
+}
 
 const preMerged = mergeSonyAuthConfirmByApproval(raw);
 const deduped = dedup(preMerged);

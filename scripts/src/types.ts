@@ -35,7 +35,11 @@ export const CATEGORY_ORDER: Category[] = [
 export type RawExpense = {
   source: Source;
   messageId: string;
-  occurredAt: string; // ISO8601 or "YYYY-MM-DD"
+  occurredAt: string; // 表示用。現地時刻 ISO8601 or "YYYY-MM-DD"
+  // 並び替え用の UTC タイムスタンプ。email の Date ヘッダーから取る。
+  // occurredAt は現地時刻なので TZ がバラバラで sort できない（JST と HST が混在する旅行記録）。
+  // sortKey は UTC で揃ってるので時系列順に並べられる。
+  sortKey?: string;
   merchantRaw: string;
   merchant: string;
   amountLocal: number | null;
