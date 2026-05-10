@@ -95,8 +95,11 @@ function isSameTransaction(a: RawExpense, b: RawExpense): boolean {
     if (na && nb && na !== nb) return false;
     return true;
   }
-  // 異 source 間（auth + receipt + confirm 系）: 既存のゆるい条件
-  if (!withinAmountTolerance(a.amountLocal, b.amountLocal)) return false;
+  // 異 source 間（sony-merged + receipt-email 等）: tip-merge.ts の承認番号ベース pre-merge
+  // を経た後はほぼ完全一致するはずなので、絶対値で厳しく判定する。
+  // 旧 ±25% 相対許容は同店舗・近額の別取引（HOWZIT $10.42 vs $11.42 等）を誤マージするため廃止。
+  if (a.amountLocal == null || b.amountLocal == null) return false;
+  if (Math.abs(a.amountLocal - b.amountLocal) > 0.10) return false;
   if (!withinTimeWindow(a.occurredAt, b.occurredAt)) return false;
   return true;
 }
@@ -129,6 +132,13 @@ function pickRepresentative(group: RawExpense[]): RawExpense {
   if (!rep.detail) {
     const detailed = sorted.find((g) => g.detail);
     if (detailed) rep.detail = detailed.detail;
+  }
+
+  // tipLocal: グループ内のいずれかが持っていれば引き継ぐ
+  // （承認番号で auth+confirm が pre-merge された結果が混ざるケースを救う）
+  if (rep.tipLocal == null) {
+    const tipped = group.find((g) => g.tipLocal != null);
+    if (tipped) rep.tipLocal = tipped.tipLocal;
   }
 
   return rep;

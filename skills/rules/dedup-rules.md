@@ -24,8 +24,13 @@ Sony銀行は同一決済について
      3. **単語集合の包含**: 短い側が2語以上で、その単語が全部長い側に含まれる
         - 例: `ISLAND VINTAGE WINE` ⊂ `IVWB ROYAL HAWAIIAN ISLAND VINTAGE WINE BAR` → merge
         - 例: `ABC #31` vs `ABC #78` → 単語集合が違うので merge しない
-2. **金額が ±25% 以内**（チップ事後追加を考慮）
+2. **金額が ±$0.10 以内**（絶対値）
 3. **日時が ±72時間以内**
+
+旧来は ±25% 相対許容で「auth はベース額 / receipt はチップ込み」の差を吸収していたが、
+`mergeSonyAuthConfirmByApproval` で auth + confirm を承認番号ベースで pre-merge する仕様に
+変更したため、cross-source dedup ではほぼ完全一致を期待してよい（同店舗で同額・近時刻の
+別取引、HOWZIT $10.42 vs $11.42 等を誤マージしないため厳しめに）。
 
 3つすべて満たさない場合は別取引として扱う。
 
@@ -40,17 +45,23 @@ Sony銀行は同一決済について
 
 これで Uber が同一トリップを 2-3 通受信するケースは merge し、同店舗・近額・短時間内の別注文（HOWZIT $10.42 の Hawaiian Time WC IPA / $11.42 の Howzit Light など）は別レコードとして残せる。
 
-### Square の split-tip パターン（pre-dedup ステップ）
+### Sony 銀行の auth + confirm を承認番号で pre-merge
 
-Square は店内決済時に「ベース額」、ユーザーがチップを後で追加した時に「チップ額」を別決済として走らせる。Sony 銀行はそれぞれ別メールで届くため:
+Square 等は店内決済時に「ベース額」、ユーザーがチップを後で追加した時に「チップ額」を別決済として走らせる。Sony 銀行はそれぞれ別メールで届くが、**両方に同じ承認番号** が振られる:
 
 - `sony-bank-auth`: ベース（チップ前）
 - `sony-bank-confirm`: チップ部分のみ
-- `receipt-email` (Square): チップ込み最終 total
 
-dedup の前段で `applySplitTipMatch()` が動き、`auth.amount + confirm.amount = receipt.amount`（許容 ±$0.05）の3点セットを検出して receipt 行に統合（`tipLocal` に confirm 額）。マーチャント比較は fuzzy（Sony 銀行の truncated 表記を吸収）、時刻ウィンドウは 72h。
+dedup の前段で `mergeSonyAuthConfirmByApproval()` が動き、`notes` 内の `承認番号:XXX` が一致するペアを確定的に統合する（金額演算や receipt の有無に依存しない）。統合後のレコード:
 
-receipt が存在しない単独の auth + confirm ペアは敢えて統合せず別行で残す（推測を避ける）。
+- `amountLocal` = auth + confirm
+- `tipLocal` = confirm.amount
+- `occurredAt` = auth.occurredAt（速報側 = カード利用日）
+- source / messageId / merchantRaw は auth のものを引き継ぐ
+
+receipt-email がある場合は後段の dedup が cross-source で統合（受領 detail を取り込む）。receipt 無しの auth+confirm ペアもそのまま単独行として正しい合計を保持できる（Village Bottle $2.62+$1=$3.62 等）。
+
+承認番号が無い旧パターン（auth と confirm で confirm に最終額が載るタイプ）は post-dedup の `tipMerge()` が引き続き拾う。
 
 ---
 

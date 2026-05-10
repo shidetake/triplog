@@ -3,86 +3,77 @@ import { isFuzzyMatch, normalizeMerchant, withinTimeWindow } from "./dedup.ts";
 
 // auth / confirm に分かれて届く Sony 銀行の二段表記を1レコードに再統合する処理群。
 // パイプラインでは:
-//   1) mergeSquareSplitTip()  — pre-dedup。Square のチップ別決済 (auth + confirm = receipt) を3点統合
-//   2) dedup()                — 残りを通常の重複判定にかける
-//   3) tipMerge()             — post-dedup。確定額 > オーソリ額 のペアの差分を tip 化（旧 Sony 銀行モデル）
+//   1) mergeSonyAuthConfirmByApproval()  — pre-dedup。承認番号で auth + confirm を確定的にペア化
+//   2) dedup()                            — その結果と receipt-email 等を通常の閾値で統合
+//   3) tipMerge()                         — post-dedup。承認番号が無い旧パターン用の保険
 
-const AMOUNT_EPS = 0.05;
 const TIME_WINDOW_HOURS = 72;
-const RECEIPT_SOURCES = new Set(["receipt-email", "rideshare", "airline"]);
+const APPROVAL_RE = /承認番号[:：]\s*(\d+)/;
+
+function extractApprovalNo(notes: string | undefined): string | null {
+  if (!notes) return null;
+  const m = notes.match(APPROVAL_RE);
+  return m ? m[1]! : null;
+}
 
 /**
- * Square のチップ別決済パターンの再統合 (3-way)。
+ * Sony 銀行の auth + confirm を承認番号で確定的にペア統合する (2-way, pre-dedup)。
  *
- * Square は店内決済時に「ベース額」、客がチップを後で追加した時に「チップ額」を別決済として走らせる。
- * Sony 銀行はそれぞれ別メールで届くため:
- *   - sony-bank-auth: ベース（チップ前）の額
- *   - sony-bank-confirm: チップ部分のみ
- *   - receipt-email: チップ込みの最終 total
- * `auth.amount + confirm.amount = receipt.amount`（許容 ±$0.05）が成立する3点セットを検出して
- * receipt 行に統合し、`tipLocal` に confirm 額を入れる。
+ * Square の "チップ別決済" のように、本来1取引が auth (ベース額) + confirm (チップ部分のみ)
+ * の2回 charge に分割されるケースで、Sony 銀行は同じ承認番号を両方に振ってくる。
+ * これを使えば receipt メールの有無や金額演算に依存せず、確定的にペアを同定できる。
  *
- * dedup の前段で実行する。3つ組として消費されたレコードは後段の dedup を通らない。
+ * マージ後のレコード:
+ *   - source = sony-bank-auth (時系列の起点側を維持)
+ *   - amountLocal = auth + confirm
+ *   - tipLocal = confirm.amountLocal
+ *   - occurredAt = auth.occurredAt
+ *   - merchantRaw / merchant / messageId = auth のものを引き継ぐ
+ *
+ * 後段の dedup() で receipt-email と通常の閾値で統合される。承認番号が片方にしか無いケースは
+ * touch せずスルー（後段の tipMerge で拾う、または auth/confirm 単独行として残る）。
  */
-export function mergeSquareSplitTip(expenses: RawExpense[]): RawExpense[] {
+export function mergeSonyAuthConfirmByApproval(expenses: RawExpense[]): RawExpense[] {
   const consumed = new Set<number>();
   const out: RawExpense[] = [];
 
-  for (let r = 0; r < expenses.length; r++) {
-    if (consumed.has(r)) continue;
-    const receipt = expenses[r]!;
-    if (!RECEIPT_SOURCES.has(receipt.source)) continue;
-    if (receipt.amountLocal == null) continue;
-
-    const rMerchant = normalizeMerchant(receipt.merchantRaw);
-    let foundAuth = -1;
-    let foundConfirm = -1;
-
-    outer: for (let a = 0; a < expenses.length; a++) {
-      if (consumed.has(a) || a === r) continue;
-      const auth = expenses[a]!;
-      if (auth.source !== "sony-bank-auth" || auth.amountLocal == null) continue;
-      if (auth.currencyLocal !== receipt.currencyLocal) continue;
-      if (!isFuzzyMatch(normalizeMerchant(auth.merchantRaw), rMerchant)) continue;
-      if (!withinTimeWindow(auth.occurredAt, receipt.occurredAt, TIME_WINDOW_HOURS)) continue;
-
-      for (let c = 0; c < expenses.length; c++) {
-        if (consumed.has(c) || c === r || c === a) continue;
-        const confirm = expenses[c]!;
-        if (confirm.source !== "sony-bank-confirm" || confirm.amountLocal == null) continue;
-        if (confirm.currencyLocal !== receipt.currencyLocal) continue;
-        if (!isFuzzyMatch(normalizeMerchant(confirm.merchantRaw), rMerchant)) continue;
-        if (!withinTimeWindow(confirm.occurredAt, receipt.occurredAt, TIME_WINDOW_HOURS)) continue;
-
-        const sum = auth.amountLocal + confirm.amountLocal;
-        if (Math.abs(sum - receipt.amountLocal) <= AMOUNT_EPS) {
-          foundAuth = a;
-          foundConfirm = c;
-          break outer;
-        }
-      }
-    }
-
-    if (foundAuth >= 0 && foundConfirm >= 0) {
-      const auth = expenses[foundAuth]!;
-      const confirm = expenses[foundConfirm]!;
-      out.push({
-        ...receipt,
-        occurredAt: auth.occurredAt, // 利用日 = Sony 銀行のカード利用日（速報側）
-        tipLocal: confirm.amountLocal,
-        amountJPY: receipt.amountJPY ?? confirm.amountJPY ?? auth.amountJPY ?? null,
-      });
-      consumed.add(r);
-      consumed.add(foundAuth);
-      consumed.add(foundConfirm);
-    } else {
-      out.push(receipt);
-      consumed.add(r);
-    }
+  // auth インデックスを承認番号でひける map に
+  const authByApproval = new Map<string, number>();
+  for (let i = 0; i < expenses.length; i++) {
+    const e = expenses[i]!;
+    if (e.source !== "sony-bank-auth") continue;
+    const ap = extractApprovalNo(e.notes);
+    if (ap && !authByApproval.has(ap)) authByApproval.set(ap, i);
   }
 
-  for (let i = 0; i < expenses.length; i++) {
-    if (!consumed.has(i)) out.push(expenses[i]!);
+  for (let j = 0; j < expenses.length; j++) {
+    const c = expenses[j]!;
+    if (c.source !== "sony-bank-confirm") continue;
+    const ap = extractApprovalNo(c.notes);
+    if (!ap) continue;
+    const i = authByApproval.get(ap);
+    if (i == null || consumed.has(i) || consumed.has(j)) continue;
+
+    const auth = expenses[i]!;
+    if (auth.currencyLocal !== c.currencyLocal) continue;
+    if (auth.amountLocal == null || c.amountLocal == null) continue;
+    if (!withinTimeWindow(auth.occurredAt, c.occurredAt, TIME_WINDOW_HOURS)) continue;
+    // 念のためマーチャントもチェック（承認番号が万一衝突した場合の保険）。
+    // Sony 銀行は表記が揺れる（"SHO" vs "SHOP &" など truncation 違い）ので fuzzy で判定。
+    if (!isFuzzyMatch(normalizeMerchant(auth.merchantRaw), normalizeMerchant(c.merchantRaw))) continue;
+
+    out.push({
+      ...auth,
+      amountLocal: Number((auth.amountLocal + c.amountLocal).toFixed(2)),
+      amountJPY: auth.amountJPY ?? c.amountJPY ?? null,
+      tipLocal: c.amountLocal,
+    });
+    consumed.add(i);
+    consumed.add(j);
+  }
+
+  for (let k = 0; k < expenses.length; k++) {
+    if (!consumed.has(k)) out.push(expenses[k]!);
   }
   return out;
 }

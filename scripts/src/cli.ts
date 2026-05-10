@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RawExpense, TripConfig } from "./types.ts";
 import { dedup } from "./dedup.ts";
-import { mergeSquareSplitTip, tipMerge } from "./tip-merge.ts";
+import { mergeSonyAuthConfirmByApproval, tipMerge } from "./tip-merge.ts";
 import { categorize } from "./categorize.ts";
 import { applyFx } from "./fx.ts";
 import { summarizeByCategory, toTsv } from "./build-tsv.ts";
@@ -27,7 +27,7 @@ const raw: RawExpense[] = JSON.parse(
   readFileSync(resolve(tripDir, "raw/extracted.json"), "utf8"),
 );
 
-const preMerged = mergeSquareSplitTip(raw);
+const preMerged = mergeSonyAuthConfirmByApproval(raw);
 const deduped = dedup(preMerged);
 const tipped = tipMerge(deduped);
 const categorized = categorize(tipped);
