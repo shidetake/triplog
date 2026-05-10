@@ -46,7 +46,10 @@ const tsv = toTsv(normalized);
 writeFileSync(resolve(tripDir, "output.tsv"), tsv + "\n");
 
 console.error(`wrote ${normalized.length} rows to trips/${slug}/output.tsv`);
-console.error("category totals (JPY):");
-for (const [cat, { count, jpy }] of summarizeByCategory(normalized)) {
-  console.error(`  ${cat}: ${count} rows, ¥${jpy.toLocaleString()}`);
+console.error("category totals:");
+for (const [cat, s] of summarizeByCategory(normalized)) {
+  const pending = s.jpyPendingRows > 0 ? ` / 未確定 ${s.jpyPendingRows}件` : "";
+  console.error(
+    `  ${cat}: ${s.count}件 (確定 ${s.jpyConfirmedRows}件 ¥${s.jpyConfirmed.toLocaleString()}${pending})`,
+  );
 }

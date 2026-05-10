@@ -49,8 +49,7 @@ export type RawExpense = {
 
 export type NormalizedExpense = RawExpense & {
   category: Category;
-  amountJPY: number; // 正規化後は必須
-  fxRate: number | "BANK";
+  amountJPY: number | null; // 確定 JPY のみ。未確定は null（書き込み時は空欄）
   excluded: boolean; // I列 計算対象外
 };
 
@@ -72,7 +71,6 @@ export type TripConfig = {
   primaryStay?: string;
   queries: string[];
   noiseFilters?: NoiseFilters;
-  fxRateOverride?: number | null;
 };
 
 export type RawMessage = {

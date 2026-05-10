@@ -10,7 +10,7 @@
 | E | 詳細 | string | ✓ | 品名のみ（チップ・タックスは入れない） |
 | F | 現地価格 | number | △ | 外貨行は数値。**JPY 行は空** |
 | G | レート | number | **✗ 書かない** | シート側に formula `=IF(ISBLANK($F),"",$H/$F)` が入っている。F と H から auto 計算 |
-| H | 円 | integer | ✓ | 整数。値で書く（数式不可） |
+| H | 円 | integer | △ | 確定 JPY のみ。USD 払いで未確定なら **空**（仮レートで概算しない） |
 | I | 計算対象外 | boolean | ✓ | 集計除外フラグ。明示的に `FALSE` |
 
 ---
@@ -20,7 +20,8 @@
 1. **G 列（レート）には絶対に書き込まない**。formula が壊れる。書き込み時は `mcp__gsheets__batch_update_cells` で `B:F` と `H:I` の2範囲に分けて書く（G は touch しない）。
 2. **JPY 行は F（現地価格）も空**。H にだけ円額を書く。formula は F が空のとき G を空のままにする。
 3. **「BANK」のような文字列を G に書くのは禁止**。formula を破壊する。
-4. detail 列にチップ・タックスを入れない（user 指示: 情報量0）。
+4. **F も H も確定情報のみ書く**。USD 払いで実際の円換算額が不明なら H は空（仮レートで概算しない）。
+5. detail 列にチップ・タックスを入れない（user 指示: 情報量0）。
 
 ---
 
@@ -42,14 +43,16 @@
 ## TSV / シート出力例
 
 ```
-2026/04/28	渡航	JR成田エクスプレス	東京→成田空港		    	3070	FALSE
-2026/04/28	渡航	DELTA	NRT→HNL ビジネス	2126		318900	FALSE
-2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45		4263	FALSE
-2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78		784550	FALSE
-2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08		11842	FALSE
+2026/04/28	通信	UBIGI	eSIM 米国データプラン			2000	FALSE
+2026/04/28	渡航	UBER	京都市下京区→京都市南区 11:49→12:00 Taxi 2.7km			1496	FALSE
+2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45			FALSE
+2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78			FALSE
+2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08			FALSE
 ```
 
-JPY 行は F が空、外貨行は F に数値、G はどちらも常に空（シートの formula が auto 計算）。
+- JPY 行: F が空、H に円額
+- USD 行（円未確定）: F に数値、H は空（後日銀行明細と突き合わせて手で埋める運用）
+- G はどちらも常に空（シートの formula が auto 計算）
 
 ---
 

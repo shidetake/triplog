@@ -1,54 +1,33 @@
 import type { NormalizedExpense, RawExpense, TripConfig } from "./types.ts";
 
-export type FxResolution = {
-  amountJPY: number;
-  fxRate: number | "BANK";
-};
-
 /**
- * 1レコードに対してJPY額とレート列の値を確定する。
+ * 1レコードに対して JPY を確定する（確定情報のみ）。
  *
- * 優先順位:
- *   1. amountJPY が既に取れている（Sony銀行確定）→ rate="BANK"
- *   2. JPY建てレコード → rate=1, amountJPY=amountLocal
- *   3. config.fxRateOverride があればそれで換算
- *   4. それ以外は throw（呼び出し側でユーザー判断）
+ * 確定パターン:
+ *   1. amountJPY が既に取れている（Sony 銀行確定の JPY 額がある稀なケース）
+ *   2. JPY 建てレコード（amountJPY = amountLocal）
+ * それ以外は **null** を返す。仮レートでの概算は行わない（user feedback: 確定情報のみ書く）。
  */
-export function resolveFx(
-  expense: RawExpense,
-  config: TripConfig,
-): FxResolution {
-  if (expense.amountJPY != null) {
-    return { amountJPY: Math.round(expense.amountJPY), fxRate: "BANK" };
-  }
+function resolveJpy(expense: RawExpense): number | null {
+  if (expense.amountJPY != null) return Math.round(expense.amountJPY);
   if (expense.currencyLocal === "JPY" && expense.amountLocal != null) {
-    return { amountJPY: Math.round(expense.amountLocal), fxRate: 1 };
+    return Math.round(expense.amountLocal);
   }
-  if (expense.amountLocal != null && config.fxRateOverride != null) {
-    return {
-      amountJPY: Math.round(expense.amountLocal * config.fxRateOverride),
-      fxRate: config.fxRateOverride,
-    };
-  }
-  throw new Error(
-    `cannot resolve FX for ${expense.merchant} (${expense.currencyLocal} ${expense.amountLocal})`,
-  );
+  return null;
 }
 
 export function applyFx(
   expenses: RawExpense[],
-  config: TripConfig,
+  _config: TripConfig,
 ): NormalizedExpense[] {
   return expenses.map((e) => {
     if (!e.category) {
       throw new Error(`category missing for ${e.merchant} (${e.messageId})`);
     }
-    const fx = resolveFx(e, config);
     return {
       ...e,
       category: e.category,
-      amountJPY: fx.amountJPY,
-      fxRate: fx.fxRate,
+      amountJPY: resolveJpy(e),
       excluded: false,
     };
   });
