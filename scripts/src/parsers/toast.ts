@@ -1,66 +1,61 @@
 import type { ParseResult, RawMessage } from "../types.ts";
 import { normalizeMerchant, parseUsDateTime, stripHtml } from "./util.ts";
 
-// Toast HTML emails have rows like:
-//   <tr><td>Subtotal</td><td ...>$20.00</td></tr>
-// We extract by collapsing whitespace and matching label/value pairs.
+// Toast HTML / plain-text emails:
+//   Ordered: 4/28/26 5:16 PM
+//
+//   1 Shine a Light 16oz 4pack $20.00
+//
+//   Subtotal $20.00
+//   Tax $0.94
+//   HI 5 Can 4Pack Tax $0.24
+//   Tip $4.00
+//   Total $25.18
 
-function extractKv(text: string, label: string): string | null {
-  const re = new RegExp(`${label}\\s+\\$?\\s*(-?[\\d,]+(?:\\.\\d+)?)`, "i");
+// `\b` は "Subtotal" 内の "Total" にマッチしないようにするため必須。
+function extractAmount(text: string, label: string): number | null {
+  const re = new RegExp(`\\b${label}\\s+\\$?\\s*(-?[\\d,]+(?:\\.\\d+)?)`, "i");
   const m = text.match(re);
-  return m ? m[1]!.replace(/,/g, "") : null;
+  return m ? Number(m[1]!.replace(/,/g, "")) : null;
 }
-
-const FOOTER_RE = /Powered by Toast|toasttab\.com|Tell us how we did/i;
 
 export function parseToast(msg: RawMessage): ParseResult {
   const text = stripHtml(msg.body);
 
-  const total = extractKv(text, "Total");
-  const subtotal = extractKv(text, "Subtotal");
-  const tax = extractKv(text, "Tax");
-  const tip = extractKv(text, "Tip");
+  const total = extractAmount(text, "Total");
+  if (total == null) return { ok: false, reason: "toast: no total" };
 
-  if (!total) return { ok: false, reason: "toast: no total" };
-
-  // Merchant: subject "Receipt for Order #N at <merchant>"
+  // Merchant from subject "Receipt for Order #N at <merchant>"
   const subjectMatch = msg.subject.match(/at\s+(.+?)\s*$/);
   let merchantRaw = subjectMatch ? subjectMatch[1]!.trim() : msg.subject;
-  // Remove leading "Tell us how we did! Receipt for Order #N at "
   merchantRaw = merchantRaw.replace(/^(Tell us how we did!\s*)?Receipt for Order #\d+ at\s+/i, "");
 
-  // Items: lines like "1 Shine a Light 16oz 4pack ... $20.00"
-  // We collect lines that look like items between "Ordered:" and "Subtotal"
-  const itemMatch = text.match(/Ordered:\s*[\d\/\s:APM]+(.+?)Subtotal/i);
+  // Items section: "Ordered: <m/d/y h:mm AM/PM>" の直後から "Subtotal" まで。
+  // stripHtml() が改行を space に潰すため、行アンカーは使わず lazy match で並べる。
+  // 日付フォーマットを明示してアンカーすることで先頭アイテムの数量が greedy に食われるのを防ぐ。
+  const sectionRe = /Ordered:\s*\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}\s*[AP]M\s+([\s\S]*?)\s+Subtotal\b/i;
+  const sectionMatch = text.match(sectionRe);
   let items: string[] = [];
-  if (itemMatch) {
-    const seg = itemMatch[1]!;
-    // Items appear as "<qty> <name> $price"
-    const itemRe = /(\d+)\s+([^$]+?)\s+\$(-?[\d,]+\.\d{2})/g;
-    let m;
+  if (sectionMatch) {
+    const seg = sectionMatch[1]!;
+    // 数量プレフィックス (1, 2, ...) はオプション。商品名のみ取り出す。
+    // 先頭の \s* で前アイテム末尾のスペースを食い、qty を後続グループに正しく回す。
+    const itemRe = /\s*(?:\d+\s+)?([^$]+?)\s+\$(-?[\d,]+\.\d{2})/g;
+    let m: RegExpExecArray | null;
     while ((m = itemRe.exec(seg)) !== null) {
-      items.push(`${m[2]!.trim()}`);
+      items.push(m[1]!.trim());
     }
   }
 
-  // Date: "Ordered: 4/28/26 5:16 PM"
+  // Date
   const dtMatch = text.match(/Ordered:\s*(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}\s*[AP]M)/i);
   const occurredAt = dtMatch ? parseUsDateTime(dtMatch[1]!) : null;
   if (!occurredAt) return { ok: false, reason: "toast: no ordered date/time" };
 
-  const totalNum = Number(total);
-  const tipNum = tip ? Number(tip) : null;
+  const tip = extractAmount(text, "Tip");
 
-  let detail = items.join(", ");
-  if (tipNum !== null && subtotal) {
-    const subtotalNum = Number(subtotal);
-    const pct = subtotalNum > 0 ? Math.round((tipNum / subtotalNum) * 100) : null;
-    if (pct !== null) {
-      detail = detail
-        ? `${detail}（チップ$${tipNum.toFixed(2)} / ${pct}%）`
-        : `（チップ$${tipNum.toFixed(2)} / ${pct}%）`;
-    }
-  }
+  // Detail は購入品名のみ（チップ・タックスは含めない）。
+  const detail = items.join(", ") || undefined;
 
   return {
     ok: true,
@@ -70,11 +65,11 @@ export function parseToast(msg: RawMessage): ParseResult {
       occurredAt,
       merchantRaw,
       merchant: normalizeMerchant(merchantRaw),
-      amountLocal: totalNum,
+      amountLocal: total,
       currencyLocal: "USD",
       amountJPY: null,
-      tipLocal: tipNum,
-      detail: detail || undefined,
+      tipLocal: tip ?? null,
+      detail,
     },
   };
 }

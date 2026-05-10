@@ -13,6 +13,22 @@
 
 ---
 
+## 0.5. 実行モード（reuse-raw / 取り直し）
+
+`/trip <slug>` 起動時、`trips/<slug>/raw/` に未除外の `<messageId>.json` が**既に1件以上存在する場合は reuse-raw モード**で動く（Gmail 取得=手順2/2.5/3 をスキップ）。
+
+理由: `raw/<messageId>.json` は決定的なスナップショットなので、パーサ修正の動作確認はキャッシュ済み raw に対して回せばトークン消費なしで本番経路と同一になる。Gmail 検索ロジック・noise filter を変えたときだけ `--force-refetch` で取り直す。
+
+挙動:
+
+- 既定: raw が存在 → reuse-raw / 存在しない → 通常取得
+- `--reuse-raw`: 明示。raw が空ならエラー
+- `--force-refetch`: 明示。手順3を再実行（raw を上書き）
+
+reuse-raw で動かしたとき、ユーザー確認時にその旨を必ず明示する。
+
+---
+
 ## 1. config.json を読み込む
 
 主要フィールド：
@@ -62,6 +78,21 @@
 
 巨大 HTML（Uber 等）は本文丸ごと保存して構わない（後段の `stripHtml()` で処理）。
 このダンプは subagent に任せて context を汚さないのがおすすめ（大量の本文が main context を埋めるのを避ける）。
+
+---
+
+## 3.5. Square full-receipt enrichment（reuse-raw でも必ず実行）
+
+Square のメール本文は `You paid $X to <merchant> ...` の1文と `https://squareup.com/r/<hash>` の URL のみで、品目は外部ページにある。`raw/<messageId>.json` を全件走査し:
+
+1. `from` が `messaging.squareup.com` を含み、かつ `linkedContent` が未設定のものを対象に絞る
+2. 本文中の `https://squareup.com/r/[A-Za-z0-9]+` URL を抽出
+3. `WebFetch` で取得。プロンプトは「Square receipt の品目行のみを `<qty> <name> $<price>` 形式で1行ずつ返す。subtotal/tax/tip/total/payment は除外」
+4. 返ってきた文字列を `RawMessage.linkedContent` フィールドにセットして raw JSON にマージ保存（既存フィールドは破壊しない）
+
+WebFetch が 404 / expired を返したら linkedContent は未設定のまま残し、detail は空欄で続行する（過剰に retry しない）。
+
+reuse-raw モードであっても、`linkedContent` が無い Square 行があればここで埋める（古い raw キャッシュに後から enrichment を足せる仕組み）。
 
 ---
 
@@ -134,3 +165,4 @@
 - 推測値での欄埋め
 - 確定日ベースの記録（必ず利用日）
 - 「とりあえず動く」ためにルールを緩める変更
+- detail 列にチップ・タックス情報を入れる（情報量0。品目のみ書く）

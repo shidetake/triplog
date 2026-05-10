@@ -88,6 +88,9 @@ export type RawMessage = {
     path: string; // relative to trip dir
     textContent?: string; // extracted text for PDFs etc.
   }>;
+  // Square 等、本文に full-receipt URL のみ載せて中身が外部にあるソース向け。
+  // skill 側で WebFetch して取得したテキストを格納する。
+  linkedContent?: string;
 };
 
 export type ParseResult =

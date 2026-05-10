@@ -31,11 +31,21 @@ export function normalizeMerchant(name: string): string {
   return n;
 }
 
-// Fuzzy match: one is a prefix of the other (after a common min length)
+// Fuzzy match の3段階:
+//   1) 完全一致
+//   2) prefix / suffix 一致（長さ6以上）
+//   3) 単語集合の包含（短い側が2語以上で、その単語が全部長い側に含まれる）
+//      例: "ISLAND VINTAGE WINE" ⊂ "IVWB ROYAL HAWAIIAN ISLAND VINTAGE WINE BAR"
+//      金額±25% / 時刻±72h と AND で評価されるので、誤マージは現実的にほぼ起きない。
 function isFuzzyMatch(a: string, b: string): boolean {
   if (a === b) return true;
-  if (a.length < 6 || b.length < 6) return false;
-  return a.startsWith(b) || b.startsWith(a);
+  if (a.length >= 6 && b.length >= 6 && (a.startsWith(b) || b.startsWith(a))) return true;
+  const wordsA = a.split(/\s+/).filter(Boolean);
+  const wordsB = b.split(/\s+/).filter(Boolean);
+  const [shortW, longW] = wordsA.length <= wordsB.length ? [wordsA, wordsB] : [wordsB, wordsA];
+  if (shortW.length < 2) return false;
+  const longSet = new Set(longW);
+  return shortW.every((w) => longSet.has(w));
 }
 
 export function withinAmountTolerance(
