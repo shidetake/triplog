@@ -7,21 +7,22 @@
 | B | 日付 | `YYYY/MM/DD` | ✓ | 利用日（確定日ではない） |
 | C | カテゴリ | enum | ✓ | `categories.md` の語彙のみ |
 | D | 利用先 | string | ✓ | カード明細の生表記(`TST*`等)は使わない |
-| E | 詳細 | string | ✓ | 品名のみ（チップ・タックスは入れない） |
+| E | 詳細 | string | ✓ | 品名のみ（チップ・タックス・「部屋付け」等のメタは入れない） |
 | F | 現地価格 | number | △ | 外貨行は数値。**JPY 行は空** |
 | G | レート | number | **✗ 書かない** | シート側に formula `=IF(ISBLANK($F),"",$H/$F)` が入っている。F と H から auto 計算 |
 | H | 円 | integer | △ | 確定 JPY のみ。USD 払いで未確定なら **空**（仮レートで概算しない） |
 | I | 計算対象外 | boolean | ✓ | 集計除外フラグ。明示的に `FALSE` |
+| J | 備考 | string | ✓ | `RawExpense.notes` をそのまま書く。例: `部屋付け` / `承認番号:XXXXX` / `Confirmation HHGE7C ...` |
 
 ---
 
 ## 重要な書き込みルール
 
-1. **G 列（レート）には絶対に書き込まない**。formula が壊れる。書き込み時は `mcp__gsheets__batch_update_cells` で `B:F` と `H:I` の2範囲に分けて書く（G は touch しない）。
+1. **G 列（レート）には絶対に書き込まない**。formula が壊れる。書き込み時は `mcp__gsheets__batch_update_cells` で `B:F` と `H:J` の2範囲に分けて書く（G は touch しない）。
 2. **JPY 行は F（現地価格）も空**。H にだけ円額を書く。formula は F が空のとき G を空のままにする。
 3. **「BANK」のような文字列を G に書くのは禁止**。formula を破壊する。
 4. **F も H も確定情報のみ書く**。USD 払いで実際の円換算額が不明なら H は空（仮レートで概算しない）。
-5. detail 列にチップ・タックスを入れない（user 指示: 情報量0）。
+5. detail 列(E) にチップ・タックス・「部屋付け」等のメタ情報を入れない（user 指示: 情報量0）。メタは J 列（備考）へ。
 
 ---
 
@@ -37,27 +38,44 @@
   - 例: `7泊 オーシャンビュー (Resort Fee/TAT/HCT込)`
 - **渡航**: 区間・座席種別・便名
   - 例: `NRT→HNL ビジネス`
+- **部屋付け請求** (`hotel-folio` の in-stay charges): detail には品名のみ（PDF 上に品名が無いことも多いので**空欄で可**）。`部屋付け` という識別ラベルは **J 列 (備考)** に書く（`notes: "部屋付け"`）。
+
+## 備考列(J) の書き方
+
+- `RawExpense.notes` をそのまま書き出す
+- 典型例:
+  - 部屋付け請求: `部屋付け` / `部屋付け (Folio ref XXXXX)`
+  - Sony 銀行: `承認番号:NNNNNN`
+  - 航空券: `Confirmation HHGE7C / Ticket 0062... / Method AX 1000 / 2025-11-28発行`
+  - Apple Pay / 領収書番号など決済方法・参照番号
+- detail (E) と備考 (J) の責務分け:
+  - **E (詳細)**: 「何を買ったか」= 品名・区間・部屋種別
+  - **J (備考)**: 「決済の参照情報・補足ラベル」= 部屋付け / 承認番号 / 確認番号 / 決済手段 等
 
 ---
 
 ## TSV / シート出力例
 
+TSV は9列（B〜J、G は常に空）:
+
 ```
-2026/04/28	通信	UBIGI	eSIM 米国データプラン			2000	FALSE
-2026/04/28	渡航	UBER	京都市下京区→京都市南区 11:49→12:00 Taxi 2.7km			1496	FALSE
-2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45			FALSE
-2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78			FALSE
-2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08			FALSE
+2026/04/28	通信	UBIGI	eSIM 米国データプラン			2000	FALSE	Apple Pay / 領収書#1991-6512
+2026/04/28	渡航	UBER	京都市下京区→京都市南区 11:49→12:00 Taxi 2.7km			1496	FALSE	
+2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45			FALSE	
+2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78			FALSE	
+2026/04/28	飲食	ROYAL HAWAIIAN BAKERY		15.71			FALSE	部屋付け
+2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08			FALSE	承認番号:795817
 ```
 
 - JPY 行: F が空、H に円額
 - USD 行（円未確定）: F に数値、H は空（後日銀行明細と突き合わせて手で埋める運用）
 - G はどちらも常に空（シートの formula が auto 計算）
+- J: notes 由来。空でも OK
 
 ---
 
 ## 書き込み
 
-- API: `mcp__gsheets__batch_update_cells`（B:F と H:I の2範囲を別 entry で同時更新）
-- `mcp__gsheets__update_cells` で B:I を一発書きするのは G 列の formula を上書きするので **使用禁止**
+- API: `mcp__gsheets__batch_update_cells`（B:F と H:J の2範囲を別 entry で同時更新）
+- `mcp__gsheets__update_cells` で B:J を一発書きするのは G 列の formula を上書きするので **使用禁止**
 - 値は2次元配列。文字列は文字列、数値は数値、空セルは空文字列 `""`、boolean は `"FALSE"` 等の文字列

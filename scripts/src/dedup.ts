@@ -127,6 +127,13 @@ function pickRepresentative(group: RawExpense[]): RawExpense {
     if (detailed) rep.detail = detailed.detail;
   }
 
+  // notes: 上位ソースのものを優先。rep が notes を持たない場合のみ補完
+  // （J 列 / 備考に出る情報。部屋付けラベル等を取りこぼさないため）
+  if (!rep.notes) {
+    const noted = sorted.find((g) => g.notes);
+    if (noted) rep.notes = noted.notes;
+  }
+
   // tipLocal: グループ内のいずれかが持っていれば引き継ぐ
   // （承認番号で auth+confirm が pre-merge された結果が混ざるケースを救う）
   if (rep.tipLocal == null) {

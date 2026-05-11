@@ -79,6 +79,8 @@ export function parseMarriottFolio(msg: RawMessage): ParseResult {
       continue;
     }
     if (IN_STAY_FOOD_KEYWORDS.test(r.description)) {
+      // detail には品目のみ（PDF 行の description は店名コードなので空欄でも可、
+      // 中身が分かるなら入れる）。「部屋付け」というメタ情報は J 列 (備考 / notes) へ。
       inStayLines.push({
         source: "hotel-folio",
         messageId: `${msg.messageId}#${inStayLines.length + 1}`,
@@ -90,7 +92,7 @@ export function parseMarriottFolio(msg: RawMessage): ParseResult {
         amountJPY: null,
         tipLocal: null,
         category: "飲食",
-        detail: `部屋付け: ${r.description}`,
+        notes: "部屋付け",
       });
       continue;
     }

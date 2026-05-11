@@ -46,10 +46,11 @@ export function sortExpenses(expenses: NormalizedExpense[]): NormalizedExpense[]
   return [...expenses].sort(compareExpenses);
 }
 
-// 8 列のうち G（レート）はシートの formula が auto 計算するので常に空。
+// 9 列のうち G（レート）はシートの formula が auto 計算するので常に空。
 // F/H は確定情報のみ書く（仮レートで JPY 概算しない）。
 //   - JPY ネイティブ行: F = 空、H = 円額
 //   - 外貨行 (USD 等): F = 現地額、H = 確定 JPY が無ければ空
+// J（備考）には RawExpense.notes をそのまま書く（部屋付け / 承認番号 / 補足等）。
 export type SheetRow = [
   string,            // B 日付
   string,            // C カテゴリ
@@ -59,6 +60,7 @@ export type SheetRow = [
   "",                // G レート（常に空）
   number | "",       // H 円（未確定なら空）
   string,            // I 計算対象外
+  string,            // J 備考
 ];
 
 export function toSheetRows(expenses: NormalizedExpense[]): SheetRow[] {
@@ -74,6 +76,7 @@ export function toSheetRows(expenses: NormalizedExpense[]): SheetRow[] {
       "",
       e.amountJPY ?? "",
       e.excluded ? "TRUE" : "FALSE",
+      e.notes ?? "",
     ];
   });
 }
