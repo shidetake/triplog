@@ -29,8 +29,17 @@ const MERCHANT_CATEGORY_MAP: Array<[RegExp, Category]> = [
   // 衣服
   [/uniqlo|alo yoga|alo-yoga|alo　yoga|patagonia|lululemon|nike|adidas/i, "衣服"],
 
-  // 日用品（ドラッグストア・スーパー）
-  [/longs|cvs|walgreens|target|walmart|whole ?foods|whole ?fds|safeway|times super|don ?quijote|waikiki market/i, "日用品"],
+  // 飲食（スーパーマーケット — 食料品中心）
+  [/whole ?foods|whole ?fds|safeway|times super|waikiki market|foodland/i, "飲食"],
+
+  // 医療（ドラッグストア／薬局・クリニック）
+  [/longs|cvs|walgreens|pharmacy|clinic|hospital|urgent care/i, "医療"],
+
+  // カジノ
+  [/casino|caesars|wynn|bellagio|mgm|sands|hard rock hotel|poker|slot/i, "カジノ"],
+
+  // その他（雑貨・ディスカウント — 用途が混ざるので最後）
+  [/don ?quijote|target|walmart|costco/i, "その他"],
 ];
 
 export function suggestCategory(expense: RawExpense): Category | null {

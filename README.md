@@ -35,7 +35,7 @@ triplog/
 │   │   ├── extract.ts                   # 決定的パース → extracted.json + needs-agent.json
 │   │   ├── dedup.ts                     # 重複排除（fuzzy prefix一致 + 25%/72h）
 │   │   ├── tip-merge.ts                 # auth+confirm の差分 = チップ
-│   │   ├── categorize.ts                # 10カテゴリ語彙
+│   │   ├── categorize.ts                # 11カテゴリ語彙
 │   │   ├── fx.ts                        # JPY 換算（BANK / 固定レート）
 │   │   ├── build-tsv.ts                 # TSV 出力
 │   │   ├── cli.ts                       # `npm run pipeline <slug>`
