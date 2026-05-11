@@ -5,6 +5,7 @@ import { detectSource } from "./parsers/route.ts";
 import { parseSonyBankAuth, parseSonyBankConfirm } from "./parsers/sony-bank.ts";
 import { parseToast } from "./parsers/toast.ts";
 import { parseSquare } from "./parsers/square.ts";
+import { parseClover } from "./parsers/clover.ts";
 import { parseUber } from "./parsers/uber.ts";
 import { parseMarriottFolio } from "./parsers/marriott-folio.ts";
 
@@ -51,6 +52,7 @@ for (const msg of messages) {
     case "sony-bank-confirm": result = parseSonyBankConfirm(msg); break;
     case "toast":             result = parseToast(msg); break;
     case "square":            result = parseSquare(msg); break;
+    case "clover":            result = parseClover(msg); break;
     case "uber":              result = parseUber(msg); break;
     case "marriott-folio":    result = parseMarriottFolio(msg); break;
     default:

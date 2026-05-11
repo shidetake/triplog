@@ -70,7 +70,8 @@ const MONTH_TO_NUM: Record<string, string> = {
   jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
 };
 export function parseEnDateTime(s: string): string | null {
-  const m = s.match(/([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  // 月名は3〜9文字（"May" / "April" / "September" 等）を許容。MONTH_TO_NUM lookup は3文字 prefix。
+  const m = s.match(/([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
   if (!m) return null;
   const mon = m[1]!;
   const dd = m[2]!;
