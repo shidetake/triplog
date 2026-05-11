@@ -44,13 +44,16 @@
 
 - `RawExpense.notes` をそのまま書き出す
 - 典型例:
-  - 部屋付け請求: `部屋付け` / `部屋付け (Folio ref XXXXX)`
-  - Sony 銀行: `承認番号:NNNNNN`
+  - 部屋付け請求: `部屋付け`
   - 航空券: `Confirmation HHGE7C / Ticket 0062... / Method AX 1000 / 2025-11-28発行`
-  - Apple Pay / 領収書番号など決済方法・参照番号
+  - Apple Pay / 領収書番号など決済手段
 - detail (E) と備考 (J) の責務分け:
   - **E (詳細)**: 「何を買ったか」= 品名・区間・部屋種別
-  - **J (備考)**: 「決済の参照情報・補足ラベル」= 部屋付け / 承認番号 / 確認番号 / 決済手段 等
+  - **J (備考)**: 「ユーザーに意味のある補足ラベル」= 部屋付け / 確認番号 / 決済手段 等
+
+### 書いてはいけない (ノイズなので削除)
+- **Sony 銀行の承認番号** — 内部 ID にすぎず利用者には無価値。`RawExpense.approvalNo` フィールドに格納し、シートには出さない
+- **Folio ref 番号** — ホテル内の参照 ID にすぎず利用者には無価値
 
 ---
 
@@ -64,7 +67,7 @@ TSV は9列（B〜J、G は常に空）:
 2026/04/28	現地移動	UBER	HNL空港→ワイキキ 8:26AM	28.45			FALSE	
 2026/04/28	宿泊	THE ROYAL HAWAIIAN	7泊 オーシャンビュー	5234.78			FALSE	
 2026/04/28	飲食	ROYAL HAWAIIAN BAKERY		15.71			FALSE	部屋付け
-2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08			FALSE	承認番号:795817
+2026/04/29	飲食	HOWZIT BREWING	IPA Pint, Loco Moco	79.08			FALSE	
 ```
 
 - JPY 行: F が空、H に円額

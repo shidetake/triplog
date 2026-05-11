@@ -51,6 +51,9 @@ export type RawExpense = {
   category?: Category;
   detail?: string;
   notes?: string;
+  // Sony 銀行の承認番号 (auth/confirm のペアリングに使う内部 ID)。
+  // 出力 (J 列) には書かない。tip-merge のための内部メタデータ。
+  approvalNo?: string;
 };
 
 export type NormalizedExpense = RawExpense & {

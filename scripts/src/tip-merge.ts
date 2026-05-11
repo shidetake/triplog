@@ -8,12 +8,17 @@ import { isFuzzyMatch, normalizeMerchant, withinTimeWindow } from "./dedup.ts";
 //   3) tipMerge()                         — post-dedup。承認番号が無い旧パターン用の保険
 
 const TIME_WINDOW_HOURS = 72;
-const APPROVAL_RE = /承認番号[:：]\s*(\d+)/;
+// 旧フォーマット互換: 過去の extracted.json は承認番号を `notes: "承認番号:XXX"` で
+// 持っているので、新しい `approvalNo` フィールドが無ければ notes からも拾う。
+const APPROVAL_NOTES_RE = /承認番号[:：]\s*(\d+)/;
 
-function extractApprovalNo(notes: string | undefined): string | null {
-  if (!notes) return null;
-  const m = notes.match(APPROVAL_RE);
-  return m ? m[1]! : null;
+function getApprovalNo(e: { approvalNo?: string; notes?: string }): string | null {
+  if (e.approvalNo) return e.approvalNo;
+  if (e.notes) {
+    const m = e.notes.match(APPROVAL_NOTES_RE);
+    if (m) return m[1]!;
+  }
+  return null;
 }
 
 /**
@@ -42,14 +47,14 @@ export function mergeSonyAuthConfirmByApproval(expenses: RawExpense[]): RawExpen
   for (let i = 0; i < expenses.length; i++) {
     const e = expenses[i]!;
     if (e.source !== "sony-bank-auth") continue;
-    const ap = extractApprovalNo(e.notes);
+    const ap = getApprovalNo(e);
     if (ap && !authByApproval.has(ap)) authByApproval.set(ap, i);
   }
 
   for (let j = 0; j < expenses.length; j++) {
     const c = expenses[j]!;
     if (c.source !== "sony-bank-confirm") continue;
-    const ap = extractApprovalNo(c.notes);
+    const ap = getApprovalNo(c);
     if (!ap) continue;
     const i = authByApproval.get(ap);
     if (i == null || consumed.has(i) || consumed.has(j)) continue;

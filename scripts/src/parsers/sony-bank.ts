@@ -72,7 +72,7 @@ export function parseSonyBankAuth(msg: RawMessage): ParseResult {
       currencyLocal: r.currencyLocal,
       amountJPY: r.amountJPY,
       tipLocal: null,
-      notes: r.approvalNo ? `承認番号:${r.approvalNo}` : undefined,
+      approvalNo: r.approvalNo ?? undefined,
     },
   };
 }
@@ -97,7 +97,7 @@ export function parseSonyBankConfirm(msg: RawMessage): ParseResult {
       currencyLocal: r.currencyLocal,
       amountJPY: r.amountJPY,
       tipLocal: null,
-      notes: r.approvalNo ? `承認番号:${r.approvalNo}` : undefined,
+      approvalNo: r.approvalNo ?? undefined,
     },
   };
 }
