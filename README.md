@@ -147,7 +147,6 @@ HANDOFF.md §4.6 では「Sony 銀行ドルデビットは円確定額が出る 
 - **Sony 銀行のチップ専用 auth が単独行で残る**（例: `SQ *HOWZIT BREWING $4.52`、`SQ *VILLAGE BOTTLE SHO $2.62`、$1, $2 など 7 行）。これらは親 receipt 行のチップに合算すべき。
 - **対応案**: `tip-merge.ts` を「同マーチャント・近接時刻（72h）の小額単独 auth は親に吸収」するモードに拡張。現状は `sony-bank-auth + sony-bank-confirm` ペアしか扱わない。
 - **NALU HEALTH BAR が同日に 2 行**: 別訪問の可能性もあるが要確認。
-- **`*` プレフィックス + curly apostrophe で同一店が dedup されない**: 例として `*TUTU'S TREATS` (sony-bank-auth, U+2019 `'`) と `TUTU'S TREATS` (Clover, U+0027 `'`) が別行になる。同じ $14.38、~10時間差。`normalizeMerchant` を (a) `^\*` 単独プレフィックスも除去、(b) curly apostrophe (U+2019/U+2018) を straight (U+0027) に正規化、するよう拡張すれば dedup される見込み。
 
 ### 5.4 パーサ未対応のレシート形式
 needs-agent.json に落ちた / 手動追加した形式（`trips/2026-04-hawaii/raw/agent-fallback.json` 参照）:

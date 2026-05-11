@@ -23,7 +23,7 @@ export function normalizeMerchant(name: string): string {
     .replace(PREFIX_RE, "")
     .replace(/[#＃]/g, "#")
     .replace(/[-–—]/g, " ") // dash variants → space
-    .replace(/'’/g, "'")
+    .replace(/[’‘'`]/g, "'") // apostrophe variants (U+2019/U+2018/U+0060) → straight (U+0027)
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
