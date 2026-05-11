@@ -6,6 +6,7 @@
   "dataStartRow": 19,
   "writeRange": "B19:I",
   "period": { "start": "2026-04-28", "end": "2026-05-05" },
+  "timezone": "Pacific/Honolulu",
   "originAirport": "NRT",
   "destinationAirport": "HNL",
   "primaryStay": "Royal Hawaiian",

@@ -6,6 +6,22 @@
 
 レシートメール本文の日付（その店舗の現地時刻）を `occurredAt` として採用する。Sony 銀行の「カード利用日」(JST) で上書きしない。
 
+### Sony 銀行メール単独レコードの TZ 補正
+
+Sony 銀行の「カード利用日」は**送信時刻 (JST) の日付**がそのまま入る。たとえば HST 4/28 15:00 の取引はメールが JST 4/29 朝に届くので、本文の「カード利用日」も `2026-04-29` になり、現地 (HST) の利用日と 1日ずれる。
+
+レシートメールがある取引なら dedup で receipt-email 側の現地時刻が優先されて正しい日付になるが、**Sony 銀行メールしか来ない取引** (空港 ABC ストア、地下街 Square 決済店、ホテル前自販機の Uloha 等) は補正が効かない。
+
+→ `config.timezone` (IANA, 例 `"Pacific/Honolulu"`) が設定されていれば、`cli.ts` が pipeline 内で:
+
+- `source` が `sony-bank-auth` / `sony-bank-confirm`
+- かつ `occurredAt` が日付のみ (時刻なし)
+- かつ `sortKey` (= email Date ヘッダーの UTC ISO) がある
+
+の場合に、`sortKey` を `config.timezone` で日付化して `occurredAt` を上書きする。これにより同じ日のレシートあり/なし取引が同じ現地日付に揃う。
+
+新しい旅行を立ち上げるときは **config.json に必ず `timezone` を入れる**こと（忘れると Sony 銀行単独取引だけ JST 基準で 1日ずれて並ぶ）。
+
 ---
 
 ## 国際線

@@ -91,6 +91,7 @@ npm run auth:sheets    # ブラウザが開く → 承認 → ~/.config/gcloud/t
   "dataStartRow": 19,
   "writeRange": "B19:I",
   "period": { "start": "2026-08-01", "end": "2026-08-07" },
+  "timezone": "Asia/Tokyo",
   "primaryStay": "Halekulani Okinawa",
   "queries": [
     "from:(no-reply OR receipt OR receipts) \"$\" after:2026/08/01 before:2026/08/08",

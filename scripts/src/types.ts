@@ -75,6 +75,11 @@ export type TripConfig = {
   originAirport?: string;
   destinationAirport?: string;
   primaryStay?: string;
+  // 旅行先のローカルタイムゾーン (IANA, 例: "Pacific/Honolulu")。
+  // Sony 銀行メールの "カード利用日" は JST 固定なので、ハワイ等の取引は
+  // JST/HST の日付が 1 日ずれる。この値があれば cli.ts が sortKey (UTC) を
+  // 現地 TZ に変換して occurredAt を補正する。
+  timezone?: string;
   queries: string[];
   noiseFilters?: NoiseFilters;
 };

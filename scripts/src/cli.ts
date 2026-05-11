@@ -65,6 +65,36 @@ for (const e of raw) {
   }
 }
 
+// Sony 銀行メールの "カード利用日" は送信時刻 (JST) の日付がそのまま入るため、
+// 例えば HST 4/28 15:00 の取引は JST 4/29 朝にメール送信され occurredAt = 2026-04-29 になる。
+// 旅行先 TZ が分かっていれば sortKey (UTC) を現地 TZ に変換して日付を上書きする。
+// 補正対象は「日付のみ (時刻なし) の Sony 銀行レコード」だけ。本文に現地時刻が
+// 入っているソース (receipt-email 等) や、明示的に時刻付きで来る Sony confirm は触らない。
+function localDateInTz(utcIso: string, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(utcIso));
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  const d = parts.find((p) => p.type === "day")!.value;
+  return `${y}-${m}-${d}`;
+}
+if (config.timezone) {
+  for (const e of raw) {
+    if (e.source !== "sony-bank-auth" && e.source !== "sony-bank-confirm") continue;
+    if (!e.sortKey) continue;
+    if (e.occurredAt.length > 10) continue;
+    try {
+      e.occurredAt = localDateInTz(e.sortKey, config.timezone);
+    } catch {
+      /* skip on bad date */
+    }
+  }
+}
+
 const preMerged = mergeSonyAuthConfirmByApproval(raw);
 const deduped = dedup(preMerged);
 const tipped = tipMerge(deduped);
